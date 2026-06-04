@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>AXIOM_VECTOR_SURGE_3D // Overclock Rail Simulation</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <meta name="theme-color" content="#00ff66">
+
+  <style>
+    /* RESETEO ATÓMICO Y VARIABLES VECTORIALES */
+    :root {
+      --bg-deep: #030305;
+      --panel-glass: rgba(5, 5, 10, 0.75);
+      --neon-primary: #00ff66; /* Verde Vectorial */
+      --neon-accent: #00d9ff;  /* Cian */
+      --text-main: #ffffff;
+      --text-muted: rgba(255, 255, 255, 0.35);
+      --border-glow: rgba(0, 255, 102, 0.25);
+      --font-hud: 'Orbitron', sans-serif;
+      --font-mono: 'Share Tech Mono', monospace;
+      --watermark-color: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Mutación atmosférica elástica (Modo Claro) */
+    html.light-mode {
+      --bg-deep: #e8ebe1;
+      --panel-glass: rgba(230, 235, 225, 0.85);
+      --neon-primary: #009933;
+      --neon-accent: #0077aa;
+      --text-main: #050508;
+      --text-muted: rgba(5, 5, 8, 0.5);
+      --border-glow: rgba(0, 153, 51, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      font-family: var(--font-hud);
+      overflow: hidden;
+      width: 100vw;
+      height: 100dvh;
+      position: relative;
+      transition: background-color 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    /* CONTENEDOR DE SIMULACIÓN NATIVO */
+    #canvas-viewport {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: auto;
+    }
+
+    /* EFECTO DE LÍNEAS DE ESCANEO CRT VECTORIAL */
+    body::after {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(0, 255, 102, 0.03), rgba(0, 217, 255, 0.02), rgba(255, 0, 50, 0.03));
+      z-index: 99;
+      background-size: 100% 4px, 6px 100%;
+      pointer-events: none;
+    }
+    /* CAPA OVERLAY INTERFAZ HUD */
+    .hud-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 40;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      padding-top: calc(24px + env(safe-area-inset-top));
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+
+    .interactive-element {
+      pointer-events: auto;
+    }
+
+    /* PANELES DE CRISTAL VECTORIAL */
+    .glass-panel {
+      background: var(--panel-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glow);
+      border-radius: 12px;
+      padding: 16px 24px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+
+    .metrics-container {
+      display: flex;
+      gap: 24px;
+      font-family: var(--font-hud);
+    }
+
+    .metric-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .metric-value {
+      font-weight: 900;
+      font-size: 2rem;
+      color: var(--neon-primary);
+      letter-spacing: 1px;
+      text-shadow: 0 0 12px var(--border-glow);
+    }
+
+    /* CONMUTADOR ATMOSFÉRICO */
+    .theme-toggle {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-glow);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: background 0.2s;
+    }
+
+    /* SELLO DE AUTOR CINÉTICO CON SOPORTE DE DISTORSIÓN (FUERZA G) */
+    #axiom-watermark {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--watermark-color);
+      pointer-events: none;
+      z-index: 100;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      transform-origin: right bottom;
+      transition: transform 0.05s ease-out;
+    }
+
+    /* TELEMETRÍA DE IMPACTO / IMPACT FLASH */
+    #pique-message-bunker {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-100%, -50%);
+      width: 92%;
+      max-width: 460px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      background: rgba(255, 0, 70, 0.85);
+      border: 2px solid #ff0044;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(255, 0, 70, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    #pique-message-bunker.active {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+    }
+
+    .hidden { display: none !important; }
+
+    .axiom-footer {
+      max-width: 440px;
+      margin: 12px auto 0 auto;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 10px;
+      line-height: 1.4;
+    }
+    .axiom-footer span { color: var(--neon-accent); }
+  </style>
+</head>
+<body>
+
+  <canvas id="canvas-viewport"></canvas>
+
+  <div id="axiom-watermark">[AXIOM_SURGE // V10.0.0]</div>
+
+  <div class="hud-overlay">
+
+    <header class="hud-header interactive-element">
+      <div class="glass-panel metrics-container">
+        <div class="metric-box">
+          <span class="metric-label">DATA_SURFED</span>
+          <div id="score-display" class="metric-value">000000</div>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">OVERCLOCK</span>
+          <div id="multiplier-display" class="metric-value" style="color: var(--neon-accent);">1.0x</div>
+        </div>
+      </div>
+
+      <button id="theme-btn" class="theme-toggle" onclick="toggleThemeEngine()">
+        <span id="theme-icon">⚡</span>
+      </button>
+    </header>
+
+    <div id="pique-message-bunker" class="interactive-element">
+      <div id="pique-text">◤ SUBSISTEMA VECTORIAL COLAPSADO ◢</div>
+    </div>
+
+    <div class="glass-panel interactive-element" id="auth-gate-bunker" style="align-self: center; width: 100%; max-width: 420px; margin-bottom: 12px;">
+      <div id="login-form-wrapper">
+        <h3 class="auth-title">◤ Sincronizar Enclave Supabase Auth ◢</h3>
+        <div class="form-group">
+          <input type="email" id="auth-email" class="auth-input" placeholder="INGRESA TU EMAIL DE OPERADOR" style="background: rgba(0,0,0,0.5); border: 1px solid var(--border-glow); padding: 12px; color: #fff; border-radius: 6px; outline: none; font-family: var(--font-mono);" required>
+          <button id="auth-submit-btn" class="auth-btn" onclick="executeSupabaseAuth()">Inyectar</button>
+        </div>
+      </div>
+
+      <div id="user-logged-wrapper" class="hidden">
+        <h3 class="auth-title" style="color: var(--neon-primary);">◤ Operador Sincronizado ◢</h3>
+        <div id="user-status-text" style="font-family: var(--font-mono); font-size: 0.85rem; text-align: center; color: var(--text-main);"></div>
+      </div>
+
+      <footer class="axiom-footer">
+        Despliegue estructural de <span>alto rendimiento</span> sin servidores intermediarios. Simulación interactiva de raíles a través de renderizado nativo por GPU y procesamiento asíncrono.
+        <br><br>
+        © 2026 Axiom Systems. Sovereign DeepTech Infrastructure.
+      </footer>
+    </div>
+
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // ==========================================
+    // 1. AUDIO-ID: SINTETIZADOR PROCEDURAL EVOLUTIVO
+    // ==========================================
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playAxiomBeep(freq, type, duration = 0.1) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type; // 'square' para metal, 'sawtooth' para tensión, 'sine' para fluido
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // ==========================================
+    // 2. VARIABLES GLOBALES BARE-METAL (TELEMETRÍA)
+    // ==========================================
+    let scene, camera, renderer, playerMesh, tunnelSegments = [], dataWalls = [];
+    let score = 0, speedMultiplier = 1.0, lastTime = performance.now();
+    let targetLane = 0; // -1: Izquierda, 0: Centro, 1: Derecha
+    const LANE_WIDTH = 1.5;
+    const RECORD_MANUEL = 88;
+
+    const pointer = new THREE.Vector2();
+    const watermark = document.getElementById('axiom-watermark');
+
+    // ==========================================
+    // 3. ARQUITECTURA DEL MOTOR VECTORIAL
+    // ==========================================
+    function initEngine3D() {
+      const canvas = document.getElementById('canvas-viewport');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x030305);
+
+      camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 1.2, 4); // Perspectiva isométrica trasera elevada
+      camera.lookAt(0, 0, -5);
+
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      // Creación del Túnel de Vectores Infinito (Anillos Wireframe de control)
+      for (let i = 0; i < 15; i++) {
+        createTunnelSegment(-i * 4);
+      }
+
+      // Nave Vectorial del Jugador (Polígono de Luz del Enclave)
+      const playerGeo = new THREE.ConeGeometry(0.3, 0.8, 3);
+      playerGeo.rotateX(Math.PI / 2); // Apuntar hacia el fondo del túnel
+      const playerMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, wireframe: true });
+      playerMesh = new THREE.Mesh(playerGeo, playerMat);
+      playerMesh.position.set(0, 0, 0);
+      scene.add(playerMesh);
+
+      // Eventos Síncronos Táctiles y de Puntero
+      window.addEventListener('pointermove', onPointerMove, { passive: true });
+      window.addEventListener('resize', onWindowResize);
+
+      // Iniciar arpegio de fondo procedural
+      setInterval(() => {
+        if(speedMultiplier > 1.0) {
+          // Si hay overclock acelerado, el tono sube armónicamente
+          playAxiomBeep(80 * speedMultiplier, 'sawtooth', 0.05);
+        }
+      }, 250);
+
+      animateEngineLoop();
+    }
+
+    // CAPTURA MULTI-RAÍL DINÁMICA
+    function onPointerMove(event) {
+      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      // Calcular carril objetivo según posición horizontal del dedo (-1, 0, 1)
+      if (pointer.x < -0.3) targetLane = -1;
+      else if (pointer.x > 0.3) targetLane = 1;
+      else targetLane = 0;
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function createTunnelSegment(zPos) {
+      const ringGeo = new THREE.CylinderGeometry(3, 3, 4, 8, 1, true);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x112211, wireframe: true, transparent: true, opacity: 0.2 });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = Math.PI / 2;
+      ringMesh.position.set(0, 0, zPos);
+      scene.add(ringMesh);
+      tunnelSegments.push(ringMesh);
+    }
+
+    // SPAWN DE PAREDES DE DATOS CON UN CARRIL LIBRE (GRIETA)
+    function spawnDataWall() {
+      const openLane = Math.floor(Math.random() * 3) - 1; // -1, 0, o 1 es la grieta segura
+      const wallGroup = new THREE.Group();
+      wallGroup.userData = { openLane: openLane, checked: false };
+
+      [-1, 0, 1].forEach(lane => {
+        if(lane !== openLane) {
+          // Bloque de datos obstáculo
+          const blockGeo = new THREE.BoxGeometry(LANE_WIDTH, 2, 0.2);
+          const blockMat = new THREE.MeshBasicMaterial({ color: 0xff0044, wireframe: true });
+          const blockMesh = new THREE.Mesh(blockGeo, blockMat);
+          blockMesh.position.x = lane * LANE_WIDTH;
+          wallGroup.add(blockMesh);
+        }
+      });
+
+      wallGroup.position.z = -50; // Fondo del carril
+      scene.add(wallGroup);
+      dataWalls.push(wallGroup);
+    }
+
+    // ==========================================
+    // 4. BUCLE DE EJECUCIÓN CONTINUO (120HZ)
+    // ==========================================
+    function animateEngineLoop() {
+      requestAnimationFrame(animateEngineLoop);
+
+      const time = performance.now();
+      const delta = (time - lastTime) / 1000;
+      lastTime = time;
+
+      // Movimiento elástico suavizado del jugador hacia su raíl objetivo
+      const targetX = targetLane * LANE_WIDTH;
+      const xDiff = targetX - playerMesh.position.x;
+      playerMesh.position.x += xDiff * 0.25;
+      
+      // Rotación estética de la nave al cambiar bruscamente de dirección
+      playerMesh.rotation.z = -xDiff * 0.5;
+      playerMesh.rotation.y = time * 0.002;
+
+      // Inercia y deformación elástica por Fuerza G aplicada al Watermark
+      watermark.style.transform = `translate(${xDiff * 40}px, ${pointer.y * 15}px) skewX(${xDiff * 20}deg)`;
+
+      // Desplazamiento infinito del túnel wireframe
+      tunnelSegments.forEach(seg => {
+        seg.position.z += 12 * delta * speedMultiplier;
+        if (seg.position.z > 4) {
+          seg.position.z = -56 + (seg.position.z - 4);
+        }
+      });
+
+      // Spawn procedural de Data-Walls según cadencia
+      if (Math.random() < 0.015 * speedMultiplier && (dataWalls.length === 0 || dataWalls[dataWalls.length - 1].position.z > -30)) {
+        spawnDataWall();
+      }
+
+      // Procesamiento matricial de colisiones y reboses
+      for (let i = dataWalls.length - 1; i >= 0; i--) {
+        let wall = dataWalls[i];
+        wall.position.z += 15 * delta * speedMultiplier;
+
+        // Comprobar cruce de barrera en el eje Z
+        if (wall.position.z >= playerMesh.position.z - 0.4 && wall.position.z <= playerMesh.position.z + 0.4) {
+          if (!wall.userData.checked) {
+            // Verificar si el jugador está fuera del carril seguro (grieta)
+            if (targetLane !== wall.userData.openLane) {
+              triggerColapsoVectorial();
+              break;
+            } else {
+              // Esquiva completada con éxito (Pasó por la grieta)
+              wall.userData.checked = true;
+              score += 150;
+              document.getElementById('score-display').innerText = String(score).padStart(6, '0');
+              playAxiomBeep(440, 'sine', 0.08); // Sonido de flujo limpio
+            }
+          }
+        }
+
+        // Limpieza de memoria (Malla fuera de rango)
+        if (wall.position.z > 6) {
+          scene.remove(wall);
+          dataWalls.splice(i, 1);
+        }
+      }
+
+      // Overclock progresivo de la simulación por CPU
+      speedMultiplier += 0.01 * delta;
+      document.getElementById('multiplier-display').innerText = speedMultiplier.toFixed(1) + "x";
+
+      renderer.render(scene, camera);
+    }
+
+    // COLAPSO INSTANTÁNEO Y DESPLIEGUE DE PUNTUACIONES
+    function triggerColapsoVectorial() {
+      playAxiomBeep(110, 'sawtooth', 0.4); // Sonido de colapso pesado
+
+      // Purgar mallas activas de la GPU
+      dataWalls.forEach(wall => scene.remove(wall));
+      dataWalls = [];
+
+      const piqueBunker = document.getElementById('pique-message-bunker');
+      const diff = RECORD_MANUEL - Math.floor(score / 100);
+
+      if (diff > 0) {
+        piqueBunker.innerHTML = `◤ SISTEMA APAGADO POR COLISIÓN ◢<br><br>Has surfeado a <span style="color:var(--neon-accent); font-weight:900;">${diff}</span> unidades de telemetría de igualar el nodo invicto de Manuel.`;
+      } else {
+        piqueBunker.innerHTML = `◤ RÉCORD DE FRECUENCIA PULVERIZADO ◢<br><br>Has sobrepasado el límite por ${Math.abs(diff)} marcas. Sincroniza tu firma asíncrona.`;
+      }
+
+      piqueBunker.classList.add('active');
+      if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
+
+      // Reinicio del bus central en caliente
+      score = 0;
+      speedMultiplier = 1.0;
+      targetLane = 0;
+      playerMesh.position.set(0, 0, 0);
+      document.getElementById('score-display').innerText = "000000";
+
+      setTimeout(() => piqueBunker.classList.remove('active'), 3500);
+    }
+
+    // CONMUTACIÓN ELÁSTICA DEL MODO AMBIENTAL
+    function toggleThemeEngine() {
+      const htmlEl = document.documentElement;
+      const icon = document.getElementById('theme-icon');
+      if (htmlEl.classList.contains('light-mode')) {
+        htmlEl.classList.remove('light-mode');
+        icon.innerText = "⚡";
+        if(scene) scene.background.setHex(0x030305);
+      } else {
+        htmlEl.classList.add('light-mode');
+        icon.innerText = "🌙";
+        if(scene) scene.background.setHex(0xe8ebe1);
+      }
+      playAxiomBeep(600, 'square', 0.05);
+    }
+
+    // INTERACTIVIDAD CON SUPABASE FORM
+    function executeSupabaseAuth() {
+      const email = document.getElementById('auth-email').value;
+      if (!email || !email.includes('@')) {
+        alert("Inyecta un canal válido.");
+        return;
+      }
+      playAxiomBeep(880, 'sine', 0.1);
+      document.getElementById('login-form-wrapper').classList.add('hidden');
+      const loggedWrapper = document.getElementById('user-logged-wrapper');
+      loggedWrapper.classList.remove('hidden');
+      document.getElementById('user-status-text').innerText = `Nodo Activo: ${email.toUpperCase()} \n[Enclave Modular Conectado]`;
+    }
+
+    // INICIALIZACIÓN AUTOMÁTICA
+    window.onload = initEngine3D;
+  </script>
+</body>
+</html>
